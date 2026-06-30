@@ -1,0 +1,15 @@
+[package]
+name = "docker-intrude"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+nix = { version = "0.31.3", features = ["sched", "process", "user"] }
+caps = "0.5.6"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
