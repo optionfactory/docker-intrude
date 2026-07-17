@@ -23,7 +23,7 @@ Ensure you have Rust installed, then clone the repository and build:
 
 ```bash
 git clone https://github.com/optionfactory/docker-intrude
-cd pinch
+cd docker-intrude
 make build-release
 sudo make install
 ```
