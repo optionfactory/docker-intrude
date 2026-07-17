@@ -15,6 +15,8 @@ Install the latest pre-compiled binary via curl:
 curl -sSL \
  https://github.com/optionfactory/docker-intrude/releases/latest/download/docker-intrude-amd64-linux-musl \
  | sudo tee /usr/local/bin/docker-intrude > /dev/null \
+ && sudo chown root:docker /usr/local/bin/docker-intrude \
+ && sudo chmod 750 /usr/local/bin/docker-intrude \
  && sudo setcap cap_sys_admin,cap_sys_ptrace+ep /usr/local/bin/docker-intrude
 ```
 
@@ -23,7 +25,7 @@ Ensure you have Rust installed, then clone the repository and build:
 
 ```bash
 git clone https://github.com/optionfactory/docker-intrude
-cd docker-intrude
+cd docker-indrude
 make build-release
 sudo make install
 ```

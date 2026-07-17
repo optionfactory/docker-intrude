@@ -12,7 +12,9 @@ run:
 	cargo run
 
 install:
-	cp target/x86_64-unknown-linux-musl/release/docker-intrude /usr/local/bin/docker-intrude
+	sudo cp target/x86_64-unknown-linux-musl/release/docker-intrude /usr/local/bin/docker-intrude
+	sudo chown root:docker /usr/local/bin/docker-intrude
+	sudo chmod 750 /usr/local/bin/docker-intrude	
 	sudo setcap cap_sys_admin,cap_sys_ptrace+ep /usr/local/bin/docker-intrude
 
 publish-github: build-release
