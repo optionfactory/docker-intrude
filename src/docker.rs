@@ -85,6 +85,9 @@ impl DockerClient {
             return Err(format!("Socket not found at {socket_path}"));
         }
         let mut stream = UnixStream::connect(&socket_path).map_err(|e| e.to_string())?;
+        let timeout = Some(std::time::Duration::from_secs(10));
+        stream.set_read_timeout(timeout).map_err(|e| format!("Failed to set read timeout: {e}"))?;
+        stream.set_write_timeout(timeout).map_err(|e| format!("Failed to set write timeout: {e}"))?;
 
         let mut request = format!("{method} {path} HTTP/1.0\r\nHost: localhost\r\nAccept: application/json\r\n");
         if let Some(ref body) = json_body {
