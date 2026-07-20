@@ -28,15 +28,17 @@ fn main() {
         }
     }
 }
+
 fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
-    DockerClient::ping()?;
+    let docker = DockerClient::new()?;
+    docker.ping()?;
 
     if !config.quiet {
         println!(":: Preparing Docker network holder ({}) ::", config.name);
     }
 
-    let _cleanup_guard = DockerClient::provision_network_holder(&config.name, &config.net, &config.ip)?;
-    let pid = DockerClient::get_container_pid(&config.name)?;
+    let _cleanup_guard = docker.provision_network_holder(&config.name, &config.net, &config.ip)?;
+    let pid = docker.get_container_pid(&config.name)?;
 
     let ns_path = format!("/proc/{pid}/ns/net");
     let ns_file = File::open(&ns_path).map_err(|e| format!("Failed to open namespace file {ns_path}: {e}"))?;
@@ -47,11 +49,10 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
 
     let pid_owner_uid = meta.uid();
 
-    let real_uid = nix::unistd::getuid().as_raw();
-
-    if real_uid != 0 && pid_owner_uid != real_uid {
+    if pid_owner_uid != docker.socket_uid {
         return Err(format!(
-            "Target namespace is owned by UID {pid_owner_uid} but you are UID {real_uid}. Aborting to prevent privilege escalation."
+            "Target namespace is owned by UID {pid_owner_uid}, but the Docker socket is owned by UID {}. Aborting due to potential privilege escalation.",
+            docker.socket_uid
         ));
     }
 
@@ -96,6 +97,7 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
                 if let Err(e) = caps::clear(None, caps::CapSet::Permitted) {
                     return Err(format!("Failed to drop permitted caps in child: {e}"));
                 }
+
                 let err = Command::new(&config.cmd[0]).args(&config.cmd[1..]).exec();
                 Err(format!("Failed to exec target command: {err}"))
             };
@@ -104,6 +106,7 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
                 eprintln!("Namespace Error: {e}");
                 std::process::exit(1);
             }
+
             // unreachable
             std::process::exit(0);
         }

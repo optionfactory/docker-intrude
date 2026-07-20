@@ -51,13 +51,16 @@ struct InspectResponse {
     state: ContainerState,
 }
 
-pub struct ContainerGuard {
+pub struct ContainerGuard<'a> {
     pub name: String,
+    client: &'a DockerClient,
 }
 
-impl Drop for ContainerGuard {
+impl<'a> Drop for ContainerGuard<'a> {
     fn drop(&mut self) {
-        let _ = DockerClient::query_socket("DELETE", &format!("/containers/{}?force=true", self.name), None);
+        let _ = self
+            .client
+            .query_socket("DELETE", &format!("/containers/{}?force=true", self.name), None);
     }
 }
 
@@ -70,24 +73,39 @@ fn resolve_socket_path() -> String {
     "/var/run/docker.sock".to_string()
 }
 
-pub struct DockerClient;
+pub struct DockerClient {
+    socket_path: String,
+    pub socket_uid: u32,
+}
 
 impl DockerClient {
-    fn query_socket(method: &str, path: &str, json_body: Option<String>) -> Result<(u16, String), String> {
+    pub fn new() -> Result<Self, String> {
         let socket_path = resolve_socket_path();
         let real_uid = nix::unistd::getuid().as_raw();
-        if let Ok(meta) = std::fs::metadata(&socket_path) {
-            let owner_uid = meta.uid();
-            if owner_uid != 0 && owner_uid != real_uid {
-                return Err("Socket owner mismatch.".to_string());
-            }
-        } else {
-            return Err(format!("Socket not found at {socket_path}"));
+
+        let meta = std::fs::metadata(&socket_path).map_err(|_| format!("Socket not found at {socket_path}"))?;
+
+        let socket_uid = meta.uid();
+        if socket_uid != 0 && socket_uid != real_uid {
+            return Err("Socket owner mismatch.".to_string());
         }
-        let mut stream = UnixStream::connect(&socket_path).map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            socket_path,
+            socket_uid,
+        })
+    }
+
+    fn query_socket(&self, method: &str, path: &str, json_body: Option<String>) -> Result<(u16, String), String> {
+        let mut stream = UnixStream::connect(&self.socket_path).map_err(|e| e.to_string())?;
+
         let timeout = Some(std::time::Duration::from_secs(10));
-        stream.set_read_timeout(timeout).map_err(|e| format!("Failed to set read timeout: {e}"))?;
-        stream.set_write_timeout(timeout).map_err(|e| format!("Failed to set write timeout: {e}"))?;
+        stream
+            .set_read_timeout(timeout)
+            .map_err(|e| format!("Failed to set read timeout: {e}"))?;
+        stream
+            .set_write_timeout(timeout)
+            .map_err(|e| format!("Failed to set write timeout: {e}"))?;
 
         let mut request = format!("{method} {path} HTTP/1.0\r\nHost: localhost\r\nAccept: application/json\r\n");
         if let Some(ref body) = json_body {
@@ -122,17 +140,16 @@ impl DockerClient {
         Ok((status_code, body))
     }
 
-    pub fn ping() -> Result<(), String> {
-        let (status, _) = Self::query_socket("GET", "/_ping", None)?;
+    pub fn ping(&self) -> Result<(), String> {
+        let (status, _) = self.query_socket("GET", "/_ping", None)?;
         if status != 200 {
             return Err("Docker daemon is not responding over the socket.".to_string());
         }
         Ok(())
     }
 
-    fn ensure_image_exists() -> Result<(), String> {
-        let (status, _) = Self::query_socket("GET", &format!("/images/{}/json", SLOTH_IMAGE), None)?;
-
+    fn ensure_image_exists(&self) -> Result<(), String> {
+        let (status, _) = self.query_socket("GET", &format!("/images/{}/json", SLOTH_IMAGE), None)?;
         if status == 200 {
             return Ok(());
         }
@@ -143,7 +160,7 @@ impl DockerClient {
         );
 
         let (pull_status, pull_body) =
-            Self::query_socket("POST", &format!("/images/create?fromImage={}", SLOTH_IMAGE), None)?;
+            self.query_socket("POST", &format!("/images/create?fromImage={}", SLOTH_IMAGE), None)?;
 
         if pull_status != 200 {
             return Err(format!("Failed to pull Docker image '{}': {}", SLOTH_IMAGE, pull_body));
@@ -152,10 +169,9 @@ impl DockerClient {
         Ok(())
     }
 
-    pub fn provision_network_holder(name: &str, net: &str, ip: &str) -> Result<ContainerGuard, String> {
-        Self::ensure_image_exists()?;
-
-        let _ = Self::query_socket("DELETE", &format!("/containers/{name}?force=true"), None);
+    pub fn provision_network_holder(&self, name: &str, net: &str, ip: &str) -> Result<ContainerGuard<'_>, String> {
+        self.ensure_image_exists()?;
+        let _ = self.query_socket("DELETE", &format!("/containers/{name}?force=true"), None);
 
         let mut endpoints_map = HashMap::new();
         endpoints_map.insert(
@@ -178,26 +194,29 @@ impl DockerClient {
         };
 
         let serialized_body = serde_json::to_string(&create_payload).map_err(|e| e.to_string())?;
-
-        let (create_status, create_body) = Self::query_socket(
+        let (create_status, create_body) = self.query_socket(
             "POST",
             &format!("/containers/create?name={name}"),
             Some(serialized_body),
         )?;
+
         if create_status != 201 {
             return Err(format!("Docker allocation failure: {create_body}"));
         }
 
-        let (start_status, start_body) = Self::query_socket("POST", &format!("/containers/{name}/start"), None)?;
+        let (start_status, start_body) = self.query_socket("POST", &format!("/containers/{name}/start"), None)?;
         if start_status != 204 {
             return Err(format!("Docker start failure: {start_body}"));
         }
 
-        Ok(ContainerGuard { name: name.to_string() })
+        Ok(ContainerGuard {
+            name: name.to_string(),
+            client: self,
+        })
     }
 
-    pub fn get_container_pid(name: &str) -> Result<i32, String> {
-        let (status, body) = Self::query_socket("GET", &format!("/containers/{name}/json"), None)?;
+    pub fn get_container_pid(&self, name: &str) -> Result<i32, String> {
+        let (status, body) = self.query_socket("GET", &format!("/containers/{name}/json"), None)?;
         if status != 200 {
             return Err(format!("Docker state inspection failure: {body}"));
         }
@@ -206,6 +225,7 @@ impl DockerClient {
         if inspect_data.state.pid <= 0 {
             return Err("Container holder is not running. Ensure the image is valid and try again.".to_string());
         }
+
         Ok(inspect_data.state.pid)
     }
 }
