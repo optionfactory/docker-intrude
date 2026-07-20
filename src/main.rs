@@ -45,11 +45,12 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
         .map_err(|e| format!("Failed to read namespace file descriptor metadata: {e}"))?;
 
     let pid_owner_uid = meta.uid();
+
     let real_uid = nix::unistd::getuid().as_raw();
 
     if real_uid != 0 && pid_owner_uid != real_uid {
         return Err(format!(
-            "Target namespace is owned by UID {pid_owner_uid}, but you are UID {real_uid}. Aborting to prevent privilege escalation."
+            "Target namespace is owned by UID {pid_owner_uid} but you are UID {real_uid}. Aborting to prevent privilege escalation."
         ));
     }
 
@@ -60,6 +61,13 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
     match unsafe { nix::unistd::fork() } {
         Ok(nix::unistd::ForkResult::Parent { child }) => {
             drop(ns_file);
+
+            unsafe {
+                let _ =
+                    nix::sys::signal::signal(nix::sys::signal::Signal::SIGINT, nix::sys::signal::SigHandler::SigIgn);
+                let _ =
+                    nix::sys::signal::signal(nix::sys::signal::Signal::SIGQUIT, nix::sys::signal::SigHandler::SigIgn);
+            }
 
             if let Err(e) = caps::clear(None, caps::CapSet::Effective) {
                 eprintln!("Warning: Failed to drop effective capabilities in parent: {e}");

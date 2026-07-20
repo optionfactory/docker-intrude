@@ -127,7 +127,31 @@ impl DockerClient {
         Ok(())
     }
 
+    fn ensure_image_exists() -> Result<(), String> {
+        let (status, _) = Self::query_socket("GET", &format!("/images/{}/json", SLOTH_IMAGE), None)?;
+
+        if status == 200 {
+            return Ok(());
+        }
+
+        println!(
+            ":: Image '{}' not found locally. Pulling from registry... ::",
+            SLOTH_IMAGE
+        );
+
+        let (pull_status, pull_body) =
+            Self::query_socket("POST", &format!("/images/create?fromImage={}", SLOTH_IMAGE), None)?;
+
+        if pull_status != 200 {
+            return Err(format!("Failed to pull Docker image '{}': {}", SLOTH_IMAGE, pull_body));
+        }
+
+        Ok(())
+    }
+
     pub fn provision_network_holder(name: &str, net: &str, ip: &str) -> Result<ContainerGuard, String> {
+        Self::ensure_image_exists()?;
+
         let _ = Self::query_socket("DELETE", &format!("/containers/{name}?force=true"), None);
 
         let mut endpoints_map = HashMap::new();

@@ -50,28 +50,35 @@ pub fn parse_args() -> Result<Config, String> {
         }
     }
 
-    if cmd.is_empty() { 
-        return Err("Missing command to execute".to_string()); 
+    if cmd.is_empty() {
+        return Err("Missing command to execute".to_string());
     }
-    
+
     let name_val = name.ok_or("Missing required flag: --name")?;
     let net_val = net.ok_or("Missing required flag: --net")?;
     let ip_val = ip.ok_or("Missing required flag: --ip")?;
 
-    if ip_val.parse::<IpAddr>().is_err() { 
-        return Err(format!("Invalid IP format ('{ip_val}')")); 
+    if ip_val.parse::<IpAddr>().is_err() {
+        return Err(format!("Invalid IP format ('{ip_val}')"));
     }
     if !is_valid_docker_identifier(&name_val) || !is_valid_docker_identifier(&net_val) {
         return Err("Invalid network or container identifier syntax".to_string());
     }
 
-    Ok(Config { name: name_val, net: net_val, ip: ip_val, quiet, cmd })
+    Ok(Config {
+        name: name_val,
+        net: net_val,
+        ip: ip_val,
+        quiet,
+        cmd,
+    })
 }
 
 fn is_valid_docker_identifier(s: &str) -> bool {
     !s.is_empty()
         && !s.starts_with('-')
-        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
 }
 
 fn print_help() {
