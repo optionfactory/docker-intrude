@@ -4,6 +4,7 @@ mod docker;
 use docker::DockerClient;
 use std::fs::File;
 use std::os::unix::fs::MetadataExt;
+use std::os::unix::process::CommandExt;
 use std::process::{Command, exit};
 
 fn main() {
@@ -95,19 +96,15 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
                 if let Err(e) = caps::clear(None, caps::CapSet::Permitted) {
                     return Err(format!("Failed to drop permitted caps in child: {e}"));
                 }
-
-                let status = Command::new(&config.cmd[0])
-                    .args(&config.cmd[1..])
-                    .status()
-                    .map_err(|e| format!("Failed to run target command: {e}"))?;
-
-                std::process::exit(status.code().unwrap_or(1));
+                let err = Command::new(&config.cmd[0]).args(&config.cmd[1..]).exec();
+                Err(format!("Failed to exec target command: {err}"))
             };
 
             if let Err(e) = run_child() {
                 eprintln!("Namespace Error: {e}");
                 std::process::exit(1);
             }
+            // unreachable
             std::process::exit(0);
         }
         Err(e) => Err(format!("Process fork failed: {e}")),
