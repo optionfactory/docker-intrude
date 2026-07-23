@@ -30,10 +30,10 @@ fn main() {
 }
 
 fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
-    let docker = DockerClient::new()?;
+    let docker = DockerClient::new(config.verbose)?;
     docker.ping()?;
 
-    if !config.quiet {
+    if config.verbose {
         println!(":: Preparing Docker network holder ({}) ::", config.name);
     }
 
@@ -56,7 +56,7 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
         ));
     }
 
-    if !config.quiet {
+    if config.verbose {
         println!(":: Entering namespace ::");
     }
 

@@ -76,10 +76,11 @@ fn resolve_socket_path() -> String {
 pub struct DockerClient {
     socket_path: String,
     pub socket_uid: u32,
+    verbose: bool,
 }
 
 impl DockerClient {
-    pub fn new() -> Result<Self, String> {
+    pub fn new(verbose: bool) -> Result<Self, String> {
         let socket_path = resolve_socket_path();
         let real_uid = nix::unistd::getuid().as_raw();
 
@@ -93,6 +94,7 @@ impl DockerClient {
         Ok(Self {
             socket_path,
             socket_uid,
+            verbose
         })
     }
 
@@ -153,11 +155,12 @@ impl DockerClient {
         if status == 200 {
             return Ok(());
         }
-
-        println!(
-            ":: Image '{}' not found locally. Pulling from registry... ::",
-            SLOTH_IMAGE
-        );
+        if self.verbose {
+            println!(
+                ":: Image '{}' not found locally. Pulling from registry... ::",
+                SLOTH_IMAGE
+            );
+        }
 
         let (pull_status, pull_body) =
             self.query_socket("POST", &format!("/images/create?fromImage={}", SLOTH_IMAGE), None)?;

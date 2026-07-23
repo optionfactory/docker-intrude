@@ -6,7 +6,7 @@ pub struct Config {
     pub name: String,
     pub net: String,
     pub ip: String,
-    pub quiet: bool,
+    pub verbose: bool,
     pub cmd: Vec<String>,
 }
 
@@ -25,7 +25,7 @@ pub fn parse_args() -> Result<Config, String> {
     let mut name = None;
     let mut net = None;
     let mut ip = None;
-    let mut quiet = false;
+    let mut verbose = false;
     let mut cmd = Vec::new();
 
     while let Some(arg) = args.next() {
@@ -33,7 +33,7 @@ pub fn parse_args() -> Result<Config, String> {
             "--name" | "-n" => name = Some(args.next().ok_or("Missing value for --name")?),
             "--net" => net = Some(args.next().ok_or("Missing value for --net")?),
             "--ip" => ip = Some(args.next().ok_or("Missing value for --ip")?),
-            "--quiet" | "-q" => quiet = true,
+            "--verbose" | "-v" => verbose = true,
             "--" => {
                 cmd.extend(args);
                 break;
@@ -69,7 +69,7 @@ pub fn parse_args() -> Result<Config, String> {
         name: name_val,
         net: net_val,
         ip: ip_val,
-        quiet,
+        verbose,
         cmd,
     })
 }
@@ -85,5 +85,7 @@ fn print_help() {
     println!("docker-intrude - Run commands directly within a specific Docker network namespace");
     println!();
     println!("Usage:");
-    println!("  docker-intrude --name <NAME> --net <NET> --ip <IP> [-q] -- <CMD...>");
+    println!("  docker-intrude --name <NAME> --net <NET> --ip <IP> [-v] -- <CMD...>");
+    println!("  docker-intrude --help");
+    println!("  docker-intrude --version");
 }
