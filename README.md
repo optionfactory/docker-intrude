@@ -5,8 +5,14 @@ Linux statically-linked utility that executes local host binaries inside a speci
 It spins up a temporary container with a static IP, uses `nsenter` to attach your command to its network, and runs it under your current user.
 
 ## Security & Trust Model
-By default, `docker-intrude` drops Effective, Permitted, Inheritable, and Ambient capabilities, but preserves the Capability Bounding Set so that tools requiring Linux file capabilities (like `/bin/ping` or `gdb`) continue to function.
 
+By default, `docker-intrude` is designed to run tools that require Linux file capabilities (like `/bin/ping` or `gdb`). 
+To balance usability and security, it applies the following isolation measures before executing your command:
+- **Capability Shedding:** Drops all Effective, Permitted, Inheritable, and Ambient capabilities.
+- **Setuid Protection:** Activates `SECBIT_NOROOT` to prevent legacy setuid-root binaries from automatically acquiring root privileges during execution.
+- **Bounding Set Preservation:** Leaves the Capability Bounding Set intact by default so that legitimate file capabilities continue to function.
+
+### Strict Mode (`--strict`)
 If your command doesn't need file capabilities, or if you prefer maximum privilege isolation, 
 pass the `--strict` flag to clear the Bounding Set as well:
 
@@ -40,7 +46,7 @@ curl -sSL \
   | sudo tee /usr/local/bin/docker-intrude > /dev/null \
   && sudo chown root:docker /usr/local/bin/docker-intrude \
   && sudo chmod 750 /usr/local/bin/docker-intrude \
-  && sudo setcap cap_sys_admin,cap_sys_ptrace+ep /usr/local/bin/docker-intrude
+  && sudo setcap cap_sys_admin,cap_sys_ptrace,cap_setpcap+ep /usr/local/bin/docker-intrude
 ```
 
 ## Build from Source

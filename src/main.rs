@@ -124,6 +124,14 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
 }
 
 fn drop_capabilities(strict: bool) -> Result<(), String> {
+    const SECBIT_NOROOT: libc::c_ulong = 0x01;
+    let res = unsafe { libc::prctl(libc::PR_SET_SECUREBITS, SECBIT_NOROOT, 0, 0, 0) };
+    if res != 0 {
+        return Err(format!(
+            "Failed to set SECBIT_NOROOT via prctl: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
     caps::clear(None, caps::CapSet::Effective).map_err(|e| format!("Failed to drop effective capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Permitted).map_err(|e| format!("Failed to drop permitted capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Inheritable)
@@ -132,9 +140,9 @@ fn drop_capabilities(strict: bool) -> Result<(), String> {
     if strict {
         caps::clear(None, caps::CapSet::Bounding).map_err(|e| format!("Failed to drop bounding capabilities: {e}"))?;
     }
-
     Ok(())
 }
+
 fn mount_resolve_conf() -> Result<(), String> {
     // unshare the mount namespace
     sched::unshare(sched::CloneFlags::CLONE_NEWNS).map_err(|e| format!("Failed to unshare mount namespace: {e}"))?;
