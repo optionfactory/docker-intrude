@@ -100,8 +100,7 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
                     }
                     Err(nix::errno::Errno::EINTR) => {
                         if TERMINATED.load(Ordering::Relaxed) {
-                            let _ = kill(child, Signal::SIGTERM);
-                            return Err("Process received SIGTERM, shutting down".to_string());
+                            return terminate_child_gracefully(child);
                         }
                         continue;
                     }
@@ -117,10 +116,8 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
 
                 mount_resolve_conf()?;
                 drop_capabilities(config.strict)?;
-                let (program, args) = config.cmd
-                    .split_first()
-                    .ok_or("No command specified to execute")?;
-                let err = Command::new(program).args(args).exec();                
+                let (program, args) = config.cmd.split_first().ok_or("No command specified to execute")?;
+                let err = Command::new(program).args(args).exec();
                 Err(format!("Failed to exec target command: {err}"))
             };
             if let Err(e) = run_child() {
@@ -200,4 +197,25 @@ fn mount_resolve_conf() -> Result<(), String> {
     let _ = std::fs::remove_file(&tmp_path);
     mount_res.map_err(|e| format!("Failed to bind mount resolv.conf: {e}"))?;
     Ok(())
+}
+
+
+fn terminate_child_gracefully(child: unistd::Pid) -> Result<i32, String> {
+    const EXIT_CODE_SIGTERM: i32 = 143;
+    let _ = kill(child, Signal::SIGTERM);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while std::time::Instant::now() < deadline {
+        match wait::waitpid(child, Some(wait::WaitPidFlag::WNOHANG)) {
+            Ok(wait::WaitStatus::Exited(_, code)) => return Ok(code),
+            Ok(wait::WaitStatus::Signaled(_, _, _)) => return Ok(EXIT_CODE_SIGTERM),
+            Ok(wait::WaitStatus::StillAlive) => {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            _ => return Ok(0),
+        }
+    }
+    // child ignored SIGTERM: escalate to SIGKILL and reap
+    let _ = kill(child, Signal::SIGKILL);
+    let _ = wait::waitpid(child, None);
+    Err("Child process unresponsive to SIGTERM; forcefully terminated with SIGKILL".to_string())
 }
