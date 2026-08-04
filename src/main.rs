@@ -117,7 +117,10 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
 
                 mount_resolve_conf()?;
                 drop_capabilities(config.strict)?;
-                let err = Command::new(&config.cmd[0]).args(&config.cmd[1..]).exec();
+                let (program, args) = config.cmd
+                    .split_first()
+                    .ok_or("No command specified to execute")?;
+                let err = Command::new(program).args(args).exec();                
                 Err(format!("Failed to exec target command: {err}"))
             };
             if let Err(e) = run_child() {
@@ -169,7 +172,7 @@ fn mount_resolve_conf() -> Result<(), String> {
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .subsec_nanos()
     );
 

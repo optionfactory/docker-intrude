@@ -12,7 +12,12 @@ pub struct Config {
 }
 
 pub fn parse_args() -> Result<Config, String> {
-    let args_vec: Vec<String> = env::args().skip(1).collect();
+    let args_vec: Vec<String> = env::args_os()
+        .skip(1)
+        .map(|a| a.into_string())
+        .collect::<Result<_, _>>()
+        .map_err(|_| "Invalid UTF-8 sequence in arguments".to_string())?;
+
     if args_vec.iter().any(|arg| arg == "--help" || arg == "-h") {
         print_help();
         exit(0);
