@@ -4,6 +4,16 @@ Linux statically-linked utility that executes local host binaries inside a speci
 
 It spins up a temporary container with a static IP, uses `nsenter` to attach your command to its network, and runs it under your current user.
 
+## Security & Trust Model
+By default, `docker-intrude` drops Effective, Permitted, Inheritable, and Ambient capabilities, but preserves the Capability Bounding Set so that tools requiring Linux file capabilities (like `/bin/ping` or `gdb`) continue to function.
+
+If your command doesn't need file capabilities, or if you prefer maximum privilege isolation, 
+pass the `--strict` flag to clear the Bounding Set as well:
+
+```bash
+docker-intrude --name my-project --net dev-net --ip 172.18.0.22 --strict -- ping 172.18.0.1
+```
+
 ## How It Works & DNS Resolution
 `docker-intrude` provisions a temporary network container to hold a specific Docker network namespace open. 
 
@@ -16,6 +26,7 @@ To address this without modifying your host filesystem, `docker-intrude` overrid
 2. It marks the root mount as private (`MS_PRIVATE | MS_REC`) to prevent mount propagation.
 3. It creates a temporary file (`/dev/shm`) and writes Docker's embedded DNS configuration (`nameserver 127.0.0.11\noptions ndots:0\n`) to it.
 4. It bind-mounts this file directly over `/etc/resolv.conf` and unlinks the source file from `/dev/shm`.
+
 
 ## Prerequisites
 - **Linux only** (relies on native kernel namespaces).

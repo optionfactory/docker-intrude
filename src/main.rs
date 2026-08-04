@@ -109,33 +109,32 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
                     .map_err(|e| format!("Failed to setns. Ensure binary has CAP_SYS_ADMIN and CAP_SYS_PTRACE: {e}"))?;
 
                 mount_resolve_conf()?;
-                drop_capabilities()?;
-
+                drop_capabilities(config.strict)?;
                 let err = Command::new(&config.cmd[0]).args(&config.cmd[1..]).exec();
                 Err(format!("Failed to exec target command: {err}"))
             };
-
             if let Err(e) = run_child() {
                 eprintln!("Namespace Error: {e}");
                 std::process::exit(1);
             }
-
-            // unreachable
             std::process::exit(0);
         }
         Err(e) => Err(format!("Process fork failed: {e}")),
     }
 }
 
-fn drop_capabilities() -> Result<(), String> {
+fn drop_capabilities(strict: bool) -> Result<(), String> {
     caps::clear(None, caps::CapSet::Effective).map_err(|e| format!("Failed to drop effective capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Permitted).map_err(|e| format!("Failed to drop permitted capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Inheritable)
         .map_err(|e| format!("Failed to drop inheritable capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Ambient).map_err(|e| format!("Failed to drop ambient capabilities: {e}"))?;
+    if strict {
+        caps::clear(None, caps::CapSet::Bounding).map_err(|e| format!("Failed to drop bounding capabilities: {e}"))?;
+    }
+
     Ok(())
 }
-
 fn mount_resolve_conf() -> Result<(), String> {
     // unshare the mount namespace
     sched::unshare(sched::CloneFlags::CLONE_NEWNS).map_err(|e| format!("Failed to unshare mount namespace: {e}"))?;

@@ -7,6 +7,7 @@ pub struct Config {
     pub net: String,
     pub ip: String,
     pub verbose: bool,
+    pub strict: bool,
     pub cmd: Vec<String>,
 }
 
@@ -26,6 +27,7 @@ pub fn parse_args() -> Result<Config, String> {
     let mut net = None;
     let mut ip = None;
     let mut verbose = false;
+    let mut strict = false;
     let mut cmd = Vec::new();
 
     while let Some(arg) = args.next() {
@@ -34,6 +36,7 @@ pub fn parse_args() -> Result<Config, String> {
             "--net" => net = Some(args.next().ok_or("Missing value for --net")?),
             "--ip" => ip = Some(args.next().ok_or("Missing value for --ip")?),
             "--verbose" | "-v" => verbose = true,
+            "--strict" => strict = true,
             "--" => {
                 cmd.extend(args);
                 break;
@@ -71,6 +74,7 @@ pub fn parse_args() -> Result<Config, String> {
         ip: ip_val,
         verbose,
         cmd,
+        strict
     })
 }
 
@@ -82,10 +86,13 @@ fn is_valid_docker_identifier(s: &str) -> bool {
 }
 
 fn print_help() {
-    println!("docker-intrude - Run commands directly within a specific Docker network namespace");
-    println!();
-    println!("Usage:");
-    println!("  docker-intrude --name <NAME> --net <NET> --ip <IP> [-v] -- <CMD...>");
-    println!("  docker-intrude --help");
-    println!("  docker-intrude --version");
+    eprintln!("docker-intrude - Run commands directly within a specific Docker network namespace");
+    eprintln!();
+    eprintln!("Usage:");
+    eprintln!("  docker-intrude --name <NAME> --net <NET> --ip <IP> [-v] [--strict] -- <CMD...>");
+    eprintln!("  docker-intrude --help");
+    eprintln!("  docker-intrude --version");
+    eprintln!();
+    eprintln!("Options:");
+    eprintln!("  --strict       Clear the capability bounding set (breaks ping/gdb file capabilities, provides maximum isolation)");
 }
