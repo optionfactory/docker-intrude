@@ -139,14 +139,14 @@ fn drop_capabilities(strict: bool) -> Result<(), String> {
             std::io::Error::last_os_error()
         ));
     }
+    if strict {
+        caps::clear(None, caps::CapSet::Bounding).map_err(|e| format!("Failed to drop bounding capabilities: {e}"))?;
+    }
     caps::clear(None, caps::CapSet::Effective).map_err(|e| format!("Failed to drop effective capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Permitted).map_err(|e| format!("Failed to drop permitted capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Inheritable)
         .map_err(|e| format!("Failed to drop inheritable capabilities: {e}"))?;
     caps::clear(None, caps::CapSet::Ambient).map_err(|e| format!("Failed to drop ambient capabilities: {e}"))?;
-    if strict {
-        caps::clear(None, caps::CapSet::Bounding).map_err(|e| format!("Failed to drop bounding capabilities: {e}"))?;
-    }
     Ok(())
 }
 
