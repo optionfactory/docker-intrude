@@ -69,6 +69,13 @@ fn execute_in_namespace(config: cli::Config) -> Result<i32, String> {
         ));
     }
 
+    let post_open_pid = docker.get_container_pid(&config.name)?;
+    if pid != post_open_pid {
+        return Err(format!(
+            "Container state changed while attaching to namespace (PID changed from {pid} to {post_open_pid}). The container may have restarted or terminated."
+        ));
+    }
+
     if config.verbose {
         println!(":: Entering namespace ::");
     }
