@@ -12,6 +12,14 @@ To balance usability and security, it applies the following isolation measures b
 - **Setuid Protection:** Activates `SECBIT_NOROOT` to prevent legacy setuid-root binaries from automatically acquiring root privileges during execution.
 - **Bounding Set Preservation:** Leaves the Capability Bounding Set intact by default so that legitimate file capabilities continue to function.
 
+### Accepted Design Tradeoffs & Operational Limits
+
+Because `docker-intrude` is designed as a local development and debugging wrapper, certain operational behaviors are intentional tradeoffs:
+
+* **Environment Variable Inheritance:** The target command inherits your current environment variables unaltered (including `PATH`, `HOME`, and API tokens). This is required for build tools (like Maven, Gradle, or npm) to function properly, but means `docker-intrude` does not scrub sensitive variables from the target process.
+* **Elevated File Capabilities (`setcap`):** The binary requires `cap_sys_admin`, `cap_sys_ptrace`, and `cap_setpcap` to manipulate kernel network namespaces without `sudo`. Users in the local `docker` group are already equivalent to `root` on Linux systems; these capabilities are restricted to executing namespaces and should only be installed on single-tenant or trusted developer workstations.
+* **Custom Socket Paths (`DOCKER_HOST`):** The tool honors the `DOCKER_HOST` environment variable if pointing to a local UNIX socket. While `docker-intrude` validates that the socket owner matches the current user or `root`, users should ensure their environment variables are not manipulated.
+
 ### Strict Mode (`--strict`)
 If your command doesn't need file capabilities, or if you prefer maximum privilege isolation, 
 pass the `--strict` flag to clear the Bounding Set as well:
