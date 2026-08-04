@@ -3,7 +3,8 @@ use std::io::{Read, Write};
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::net::UnixStream;
 
-const SLOTH_IMAGE: &str = "optionfactory/sloth:226";
+//pinned to optionfactory/sloth:230
+const SLOTH_IMAGE: &str = "optionfactory/sloth:230@sha256:b97e97549fa55b96aa81b0f897de9e779009bc6f95c1461865465b14cdc69acf";
 
 #[derive(serde::Serialize)]
 struct HostConfig {
