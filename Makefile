@@ -34,10 +34,11 @@ check-deps:
 publish-github: build-release
 	$(eval VERSION=v$(shell cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version'))
 	@cp target/x86_64-unknown-linux-musl/release/$(REPO_NAME) target/$(REPO_NAME)-linux-amd64-musl
+	@cd target && sha256sum $(REPO_NAME)-linux-amd64-musl > SHA256SUMS
 	@gh release create "$(VERSION)" \
 		"target/$(REPO_NAME)-linux-amd64-musl" \
 		--repo "$(REPO_OWNER)/$(REPO_NAME)" \
 		--title "$(VERSION)" \
 		--target "master" \
 		--notes ""
-	-@rm target/$(REPO_NAME)-linux-amd64-musl
+	-@rm target/$(REPO_NAME)-linux-amd64-musl SHA256SUMS
