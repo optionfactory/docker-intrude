@@ -37,6 +37,7 @@ publish-github: build-release
 	@cd target && sha256sum $(REPO_NAME)-linux-amd64-musl > SHA256SUMS
 	@gh release create "$(VERSION)" \
 		"target/$(REPO_NAME)-linux-amd64-musl" \
+		"target/SHA256SUMS" \
 		--repo "$(REPO_OWNER)/$(REPO_NAME)" \
 		--title "$(VERSION)" \
 		--target "master" \
